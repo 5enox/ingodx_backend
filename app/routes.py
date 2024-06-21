@@ -17,7 +17,6 @@ api = Namespace('api', description='Resource API',
 
 
 user_model = api.model('User', {
-    'user_id': fields.Integer(readOnly=True),
     'username': fields.String(required=True, description='The user name'),
     'email': fields.String(required=True, description='The user email'),
     'password': fields.String(required=True, description='The user password'),
