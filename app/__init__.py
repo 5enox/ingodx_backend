@@ -6,7 +6,7 @@ from .routes import api as routes_api
 from flask_jwt_extended import JWTManager
 
 
-def create_app(config_class='config.DevelopmentConfig'):
+def create_app(config_class='config.ProductionConfig'):
     app = Flask(__name__)
     # Initialize Flask-JWT-Extended
     jwt = JWTManager(app)
