@@ -1,5 +1,5 @@
 import json
-from .models import db, User, Order
+from .models import db, User, Form
 from flask_restx import Namespace, Resource, fields
 from flask import request
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -24,28 +24,24 @@ user_model = api.model('User', {
     'user_type': fields.String(required=True, description='The type of user (customer or delivery)')
 })
 
-order_model = api.model('Order', {
-    'item_description': fields.String(required=True, description='Description of the item'),
-    'pickup_address': fields.String(required=True, description='Pickup address'),
-    'delivery_address': fields.String(required=True, description='Delivery address'),
-})
 
 login_model = api.model('Login', {
     'username': fields.String(required=True, description='Username of the user'),
     'password': fields.String(required=True, description='Password of the user'),
 })
 
+form_model = api.model('UserForm', {
+    'full_name': fields.String(required=True, description='The user full name'),
+    'user_type': fields.String(required=True, description='The type of user (customer or delivery)'),
+    'vehicle_type': fields.String(required=False, description='The type of vehicle the delivery person uses'),
+    'national_card_id': fields.String(required=False, description='The national card ID of the delivery person'),
 
-@api.route('/users')
-class UserAPI(Resource):
-    @api.marshal_list_with(user_model)
-    def get(self):
-        return User.query.all()
+})
 
 
-@api.route('/register')
+@ api.route('/register')
 class Register(Resource):
-    @api.expect(user_model, validate=True)
+    @ api.expect(user_model, validate=True)
     def post(self):
         data = request.json
         username = data.get('username')
@@ -70,9 +66,9 @@ class Register(Resource):
         return {"message": "User registered successfully!"}, 201
 
 
-@api.route('/login')
+@ api.route('/login')
 class Login(Resource):
-    @api.expect(login_model, validate=True)
+    @ api.expect(login_model, validate=True)
     def post(self):
         data = request.json
         username = data.get('username')
@@ -88,114 +84,46 @@ class Login(Resource):
             return {"message": "Invalid username or password"}, 401
 
 
-# Example protected endpoint (requires authentication)
-@api.route('/orders')
-class OrderAPI(Resource):
-    @api.doc(security='JWT')
-    @jwt_required()
-    def get(self):
-        current_user_id = get_jwt_identity()
-        return Order.query.filter_by(user_id=current_user_id).all()
-
-    @api.expect(order_model, validate=True)
+@api.route('/user_form')
+class UserForm(Resource):
+    @api.expect(form_model, validate=True)
     @api.doc(security='JWT')
     @jwt_required()
     def post(self):
-        current_user_id = get_jwt_identity()
         data = request.json
-        user_id = data.get('user_id')
-        item_description = data.get('item_description')
-        pickup_address = data.get('pickup_address')
-        delivery_address = data.get('delivery_address')
+        full_name = data.get('full_name')
+        user_type = data.get('user_type')
+        vehicle_type = data.get('vehicle_type')
+        national_card_id = data.get('national_card_id')
+        current_user_id = get_jwt_identity()
 
-        new_order = Order(
+        form_data = Form(
             user_id=current_user_id,
-            item_description=item_description,
-            pickup_address=pickup_address,
-            delivery_address=delivery_address
+            full_name=full_name,
+            user_type=user_type,
+            vehicle_type=vehicle_type,
+            national_card_id=national_card_id
         )
-        db.session.add(new_order)
+        db.session.add(form_data)
         db.session.commit()
 
-        return {"message": "Order created successfully!"}, 201
+        return {"message": "Form data stored successfully!"}, 200
 
 
-@api.route('/order/<int:order_id>')
-class OrderDetail(Resource):
-    @api.doc(security='JWT')
-    @jwt_required()
-    def get(self, order_id):
-        current_user_id = get_jwt_identity()
-        order = Order.query.filter_by(
-            order_id=order_id, user_id=current_user_id).first()
-        if order:
-            return order
-        else:
-            return {"message": "Order not found"}, 404
-
-    @api.doc(security='JWT')
-    @jwt_required()
-    def post(self, order_id):
-        current_user_id = get_jwt_identity()
-        order = Order.query.filter_by(
-            order_id=order_id, user_id=current_user_id).first()
-        if order:
-            data = request.json
-            item_description = data.get('item_description')
-            pickup_address = data.get('pickup_address')
-            delivery_address = data.get('delivery_address')
-
-            order.item_description = item_description
-            order.pickup_address = pickup_address
-            order.delivery_address = delivery_address
-
-            db.session.commit()
-            return {"message": "Order updated successfully!"}, 200
-        else:
-            return {"message": "Order not found"}, 404
-
-    @api.doc(security='JWT')
-    @jwt_required()
-    def delete(self, order_id):
-        current_user_id = get_jwt_identity()
-        order = Order.query.filter_by(
-            order_id=order_id, user_id=current_user_id).first()
-        if order:
-            db.session.delete(order)
-            db.session.commit()
-            return {"message": "Order deleted successfully!"}, 200
-        else:
-            return {"message": "Order not found"}, 404
-
-
-@api.route('/delivery/orders')
-class DeliveryOrders(Resource):
+@api.route('/user_data')
+class UserData(Resource):
     @api.doc(security='JWT')
     @jwt_required()
     def get(self):
         current_user_id = get_jwt_identity()
-        if User.query.filter_by(user_id=current_user_id, user_type='delivery').first():
-            return Order.query.all()
-        else:
-            return {"message": "Access denied"}, 403
+        user = User.query.get(current_user_id)
 
-    @api.doc(security='JWT')
-    @jwt_required()
-    def post(self):
-        current_user_id = get_jwt_identity()
-        if User.query.filter_by(user_id=current_user_id, user_type='delivery').first():
-            data = request.json
-            order_id = data.get('order_id')
-            order = Order.query.filter_by(
-                order_id=order_id).first()
-            if order:
-                if order.status == 'pending':
-                    order.status = 'accepted'
-                    db.session.commit()
-                    return {"message": "Order accepted successfully!"}, 200
-                else:
-                    return {"message": "Order has already been accepted or delivered"}, 400
-            else:
-                return {"message": "Order not found"}, 404
+        if user:
+            return {
+                'username': user.username,
+                'email': user.email,
+                'full_name': user.full_name,
+                'user_type': user.user_type
+            }, 200
         else:
-            return {"message": "Access denied"}, 403
+            return {"message": "User not found"}, 404

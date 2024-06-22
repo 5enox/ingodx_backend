@@ -8,8 +8,6 @@ from flask_jwt_extended import JWTManager
 
 def create_app(config_class='config.ProductionConfig'):
     app = Flask(__name__)
-    # Initialize Flask-JWT-Extended
-    jwt = JWTManager(app)
     app.config.from_object(config_class)
     db.init_app(app)
     # Initialize Flask-JWT-Extended
